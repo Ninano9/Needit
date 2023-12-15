@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+  
+<mapper namespace="web.dao.face.MenuBusinessDao">
+
+	<!-- 게시글 조회용 SQL -->
+	<sql id="selectBoard">
+		SELECT 
+		    board_no, writer_id, writer_nick, 
+		    hit, menu, cate, title, price, content, location,
+		    CAST(write_date AS DATE) AS write_date, 
+		    (SELECT COUNT(like_no) FROM liketb R WHERE R.board_no = B.board_no) AS like_cnt,
+		    (SELECT thumbnail_name FROM fileTB WHERE fileTB.board_no = B.board_no AND rownum = 1) AS thumbnail_name,
+		    (SELECT COUNT(basket_no) FROM basket WHERE basket.board_no = B.board_no AND basket.basket_id = #{userId} ) AS basket_status
+		FROM board B
+		<where>
+			AND menu = #{menu }
+			AND cate = #{cate }	
+		</where>
+	</sql>
+	
+	<!-- 검색 조건 조회용 SQL -->
+	<sql id="searchCond">
+	    <if test='selectSub =="title"'>
+	        AND title LIKE '%' || #{searchText} || '%'
+	    </if>
+	    <if test='selectSub =="content"'> 
+	        AND content LIKE '%' || #{searchText} || '%'
+	    </if>
+	    <if test='selectSub =="writerNick"'> 
+	        AND writer_nick LIKE '%' || #{searchText} || '%'
+	    </if>
+	    <if test='selectSub =="location"'> 
+	        AND location LIKE '%' || #{searchText} || '%'
+	    </if>
+	</sql>
+	
+	<!-- 게시글 수 조회하여 페이징 처리 -->
+	<select id="selectCntAll" resultType="int" parameterType="web.util.Paging">
+		SELECT count(*) FROM (
+			<include refid="selectBoard" />
+			<include refid="searchCond" />
+		)
+	</select>
+
+	<!-- 해당 메뉴 게시글 조회 -->
+	<select id="selectAll" resultType="Map" parameterType="web.util.Paging">
+		SELECT * FROM (
+			SELECT rownum rnum, B.* FROM (
+				<include refid="selectBoard"/>
+				ORDER BY board_no DESC
+          	) B
+      	) WHERE rnum BETWEEN #{startNo} AND #{endNo}
+	</select>
+
+	<!-- 검색된 게시글 조회 -->
+	<select id="selectSearch" resultType="Map" parameterType="web.util.Paging">
+	    SELECT * FROM (
+	        SELECT rownum rnum, B.* FROM (
+	            SELECT 
+	                board_no, writer_id, writer_nick, 
+	                hit, menu, cate, title, price, content, location,
+	                CAST(write_date AS DATE) AS write_date, 
+	                (SELECT COUNT(like_no) FROM liketb R WHERE R.board_no = B.board_no) AS like_cnt,
+	                (SELECT thumbnail_name FROM fileTB WHERE fileTB.board_no = B.board_no AND rownum = 1) AS thumbnail_name,
+	                (SELECT COUNT(basket_no) FROM basket WHERE basket.board_no = B.board_no AND basket.basket_id=#{userId} ) AS basket_status
+	            FROM board B
+	            WHERE
+	                menu = #{menu}
+	                AND cate = #{cate}
+	                <if test='selectSub =="title"'>
+	                    AND title LIKE '%' || #{searchText} || '%'
+	                </if>
+	                <if test='selectSub =="content"'> 
+	                    AND content LIKE '%' || #{searchText} || '%'
+	                </if>
+	                <if test='selectSub =="writerNick"'> 
+	                    AND writer_nick LIKE '%' || #{searchText} || '%'
+	                </if>
+	                <if test='selectSub =="location"'> 
+	                    AND location LIKE '%' || #{searchText} || '%'
+	                </if>
+	            ORDER BY board_no DESC
+	        ) B
+	    ) WHERE rnum BETWEEN #{startNo} AND #{endNo}
+	</select>
+	
+	<!-- 게시글 조회수 증가 -->
+	<update id="updateHit" parameterType="Board">
+		UPDATE board
+		<set>
+			hit = hit + 1,
+		</set>
+		<where>
+			AND board_no = #{boardNo }
+		</where>
+	</update>
+	
+	<!-- 게시글 상세 조회 -->
+	<select id="selectByBoardNo" resultType="Board" parameterType="Board">
+		SELECT
+			board_no, writer_id, writer_nick
+			, write_date, hit, menu, cate
+			, title, price, content, location, B.business_url
+		FROM board V
+		INNER JOIN business B ON V.writer_id = B.id	
+		<where>
+			V.board_no = #{boardNo }
+		</where>	    
+	</select>
+	
+	<!-- 게시글 작성 -->
+    <insert id="insertBoard" parameterType="Board">
+    	<selectKey resultType="int" order="BEFORE" keyProperty="boardNo">
+    		SELECT board_seq.nextval FROM dual
+    	</selectKey>
+    		INSERT INTO board(board_no, menu, cate, writer_id, writer_nick, title, price, content, location)
+    		VALUES ( #{boardNo}, #{menu}, #{cate}, #{writerId}, #{writerNick}, #{title}, #{price}, #{content}, #{location} )
+    </insert>
+    
+    <!-- 게시글 파일 삽입 -->
+    <insert id="insertFile" parameterType="FileTb">
+    	<selectKey resultType="int" order="BEFORE" keyProperty="fileNo">
+    		SELECT fileTb_seq.nextval FROM dual
+    	</selectKey>
+    	INSERT INTO fileTb( file_no, origin_name, stored_name, thumbnail_name, file_type, board_no)
+    	VALUES( #{fileNo}, #{originName}, #{storedName}, #{thumbnailName}, #{fileType}, #{boardNo} )
+    </insert>
+    
+    <!-- 게시글 파일 조회, 목록용 -->
+   	<select id="selectFileByBoardNo" resultType="FileTb" parameterType="Board">
+		SELECT
+			file_no, board_no, origin_name, stored_name, thumbnail_name
+		FROM filetb
+		<where>
+			board_no = #{boardNo}
+		</where>
+	</select>
+	
+	<!-- 게시글 파일 조회, 다운로드용 -->
+	<select id="selectFileByFileNo" resultType="FileTb" parameterType="FileTb">
+		SELECT
+			file_no, board_no, origin_name, stored_name, thumbnail_name
+		FROM filetb
+		<where>
+			file_no = #{fileNo}
+		</where>
+	</select>
+	
+	<!-- 사용자 추천수 유무 조회 -->
+	<select id="selectCntLike" resultType="int" parameterType="Like">
+		SELECT count(like_no) FROM liketb
+		<where>
+			AND like_id = #{likeId}
+			AND board_no = #{boardNo}
+		</where>
+	</select>
+	
+	<!-- 추천 적용 -->
+	<insert id="insertLike" parameterType="Like">
+		INSERT INTO liketb ( like_no, like_id, board_no)
+		VALUES ( liketb_seq.nextval, #{likeId}, #{boardNo} )
+	</insert>
+	
+	<!-- 추천 취소 -->
+	<delete id="deleteLike" parameterType="Like">
+		DELETE liketb
+		<where>
+			AND like_id = #{likeId}
+			AND board_no = #{boardNo}
+		</where>
+	</delete>		
+	
+	<!-- 총 추천수 조회 -->
+	<select id="selectTotalCntLike" resultType="int" parameterType="Like">
+		SELECT COUNT(like_no) FROM liketb
+		<where>
+			AND board_no = #{boardNo}
+		</where>
+	</select>    
+
+	<!-- 댓글 삽입 -->
+	<insert id="insertComment" parameterType="Comment">
+		INSERT INTO commentTB ( CMT_NO, BOARD_NO, WRITER_ID, WRITER_NICK, CONTENT)
+		VALUES ( commentTB_seq.nextval, #{boardNo }, #{writerId }, #{writerNick }, #{content } )
+	</insert>
+	
+	<!-- 댓글 조회 -->
+	<select id="selectAllComment" resultType="Map" parameterType="Comment">
+		SELECT * FROM (
+		    SELECT rownum rnum, B.*, uf.THUMBNAIL_NAME 
+		    FROM (
+		        SELECT
+		            cmt_no, board_no, writer_id, writer_nick, content,
+		            CAST(write_date AS DATE) AS "writeDate"
+		        FROM commentTb
+		        WHERE board_no = #{boardNo}
+		        ORDER BY write_date DESC
+		    ) B
+		    LEFT JOIN user_file uf ON B.writer_id = uf.id
+		)
+		ORDER BY rnum
+	</select>
+	
+	<!-- 댓글 삭제 -->
+	<delete id="deleteComment" parameterType="Comment">
+		DELETE FROM commentTB
+		<where>
+			AND	cmt_no = #{cmtNo }
+			AND board_no = #{boardNo }
+		</where>
+	</delete>
+	
+	<!-- 대여 처리 -->
+	<insert id="makeRent" parameterType="Rent">
+		INSERT INTO rent ( rent_no, board_no, renter_id, rent_status, payment_type, rent_date, start_time, end_time, merchant_uid )
+		VALUES ( rent_seq.nextval, #{boardNo }, #{renterId }, #{rentStatus }, #{paymentType }, #{rentDate }, #{startTime }, #{endTime }, #{merchantUid } )
+	</insert>
+	
+	<!-- 대여 상태 확인 -->
+	<select id="chkRentStatus" resultType="map" parameterType="Board">
+		SELECT 
+			rent_no, board_no, renter_id, rent_status
+			, CAST(rent_date AS DATE) AS rent_date
+			, start_time, end_time
+		FROM rent
+		<where>
+			board_no = #{boardNo}
+		</where>
+	</select>
+	
+	<!-- 찜 상태 조회 -->
+	<select id="basketInfo" resultType="int" parameterType="Basket">
+		SELECT count(basket_no) FROM basket
+		<where>
+			AND basket_id = #{basketId}
+			AND board_no = #{boardNo}
+		</where>
+	</select>
+	
+	<!-- 찜하기 -->
+	<insert id="insertBasket" parameterType="Basket">
+		INSERT INTO basket( basket_no, board_no , basket_id, menu, cate )
+		VALUES ( basket_seq.nextval, #{boardNo}, #{basketId}, #{menu}, #{cate})
+	</insert>
+	
+	<!-- 찜 취소 -->
+	<delete id="deleteBasket" parameterType="Basket">
+		DELETE basket
+		<where>
+			AND basket_id = #{basketId}
+			AND board_no = #{boardNo}
+		</where>
+	</delete>	
+
+	<!-- 게시글 삭제  -->
+	<delete id="deleteBoard" parameterType="Board">
+		DELETE board
+		<where>
+			AND board_no = #{boardNo}
+			AND writer_id = #{writerId}
+		</where>
+	</delete>
+	
+	<!-- 게시판 수정 -->
+	<update id="updateBoard" parameterType="Board">
+		UPDATE board
+		SET title = #{title } 
+		, content = #{content } 
+		
+		<where> 
+			board_no = #{boardNo }
+		</where>
+	</update>
+	
+	<!-- 여러개 파일 삭제 -->
+	<delete id="deleteFiles" parameterType="int[]">
+		DELETE fileTb
+		<where>
+		file_no IN
+		<foreach collection="array" item="no" open="(" close=")" separator=","> #{no } </foreach>
+		</where>
+	</delete>
+
+	<!-- 작성자 위치 조회 -->
+  	<select id="selectWriteAddr" resultType="User" parameterType="User">
+  		SELECT addr1
+  		FROM usertb
+  		where id = #{id}
+  	</select>
+  
+  	<!-- 게시글 댓글 개수 조회 -->
+  	<select id="getCntCmt" resultType="int" parameterType="String" >
+  		SELECT count(cmt_no) 
+  		FROM commenttb
+  		WHERE board_no = #{boardNo}
+  	</select>
+  	
+</mapper>

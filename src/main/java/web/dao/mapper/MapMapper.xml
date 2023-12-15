@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+  
+<mapper namespace="web.dao.face.MapDao">
+	
+	<!-- 게시글 조회용 SQL -->
+	<select id="selectAllBoard">
+		SELECT board_no, menu, cate, title, price, location
+		FROM board 
+	</select>
+	
+	<select id="selectThumb">
+		SELECT thumbnail_name 
+		FROM fileTB 
+		<where>
+			AND board_no = #{boardNo} 
+			AND rownum = 1
+		</where>
+	</select>
+	
+<select id="selectBySearch" parameterType="web.util.Paging" resultType="Board" >
+    SELECT board_no, menu, cate, title, price, location
+    FROM board 
+    <where>
+        <if test='selectSub =="title"'>
+            AND title LIKE '%' || #{searchText} || '%'
+        </if>
+        <if test='selectSub =="location"'> 
+            AND location LIKE '%' || #{searchText} || '%'
+        </if>
+    </where>
+</select>
+	
+	
+</mapper>

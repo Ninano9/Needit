@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+  
+  <mapper namespace = "web.dao.face.MsgDao">
+  
+<resultMap id="egomap" type="map">
+    <result property="roomNo" column="ROOM_NO"/>
+    <result property="otherUserId" column="OTHER_USER_ID"/>
+    <result property="lastMessageTime" column="LAST_MESSAGE_TIME"/>
+    <result property="messagePreview" column="MESSAGE_PREVIEW"/>
+    <result property="msgStatus" column="MSG_STATUS"/>
+    <!-- 수정: 상대방의 닉네임을 other_nick_id로 가져옴 -->
+    <result property="otherUserNick" column="OTHER_NICK_ID"/>
+    <result property="otherUserThumbnail" column="OTHER_USER_THUMBNAIL"/>
+</resultMap>
+
+<select id="selectRoomNo" parameterType="user" resultMap="egomap">
+    SELECT 
+        r.ROOM_NO,
+        CASE 
+            WHEN r.ROOM_id1 = #{id} THEN r.ROOM_id2
+            ELSE r.ROOM_id1
+        END AS OTHER_USER_ID,
+        m.POST_DATE AS LAST_MESSAGE_TIME,
+        m.CONTENT AS MESSAGE_PREVIEW,
+        CASE
+            WHEN EXISTS (
+                SELECT 1
+                FROM msgTB
+                WHERE RECEIVER_ID = #{id} AND MSG_STATUS = 0 AND ROOM_NO = r.ROOM_NO
+            )
+            THEN 1
+            ELSE 0
+        END AS MSG_STATUS,
+        u.NICK AS OTHER_NICK_ID,
+        uf.THUMBNAIL_NAME AS OTHER_USER_THUMBNAIL
+    FROM 
+        roomTB r
+    JOIN 
+        (SELECT ROOM_NO, WRITER_ID, RECEIVER_ID, CONTENT, POST_DATE,
+                ROW_NUMBER() OVER (PARTITION BY ROOM_NO ORDER BY POST_DATE DESC) AS rn
+         FROM msgTB) m ON r.ROOM_NO = m.ROOM_NO AND m.rn = 1
+    JOIN
+        usertb u ON u.id = CASE WHEN r.ROOM_id1 = #{id} THEN r.ROOM_id2 ELSE r.ROOM_id1 END
+    LEFT JOIN
+        user_file uf ON uf.id = CASE WHEN r.ROOM_id1 = #{id} THEN r.ROOM_id2 ELSE r.ROOM_id1 END
+    WHERE 
+        #{id} IN (r.room_id1, r.room_id2)
+    ORDER BY LAST_MESSAGE_TIME DESC
+</select>
+    
+<select id="selectByRoomNo" parameterType="Msg">
+SELECT * FROM msgTB
+WHERE room_no = #{roomNo}
+ORDER BY post_date
+</select>
+
+<select id="getColunmInfo" parameterType="Msg" resultType="Msg">
+SELECT room_no, receiver_id, writer_id, menu, cate, board_no
+FROM msgtb
+WHERE room_no = #{roomNo} AND ROWNUM &lt;= 1
+</select>
+
+<insert id="insertmessage" parameterType="Msg" useGeneratedKeys="true" keyProperty="msgNo">
+  INSERT INTO msgtb (room_no, msg_no, writer_id, receiver_id, content, menu, cate, board_no)
+  VALUES (#{roomNo}, msg_seq.nextval, #{writerId}, #{receiverId}, #{content}, #{menu}, #{cate}, #{boardNo})
+  <selectKey keyProperty="msgNo" resultType="int" order="AFTER">
+    SELECT msg_seq.currval FROM dual
+  </selectKey>
+</insert>
+
+<select id="selectByMsgNo" parameterType="Msg">
+SELECT * FROM msgtb
+WHERE msg_no = #{msgNo}
+</select>
+
+<select id="selectByRoomNoLast" parameterType="Msg">
+SELECT * FROM (
+  SELECT B.*, ROWNUM as rnum
+  FROM (
+    SELECT msgtb.*
+    FROM msgtb
+    WHERE room_no = #{roomNo}
+    ORDER BY msg_no DESC
+  ) B
+)
+WHERE rnum = 1
+</select>
+
+<update id="updateStatus" parameterType="map">
+UPDATE msgTB
+SET msg_status = 1
+WHERE receiver_id = #{id}
+AND room_no = #{roomNo}
+</update>
+
+<insert id="makeNewRoom" parameterType="Msg" keyProperty="roomNo">
+<selectKey keyProperty="roomNo" resultType="int" order="BEFORE">
+    SELECT room_seq.nextval FROM dual
+  </selectKey>
+INSERT INTO roomTB(room_no,room_id1,room_id2)
+VALUES(#{roomNo},#{writerId},#{receiverId})
+</insert>
+
+<select id="selectNewRoomByMap" parameterType="map">
+SELECT room_no FROM msgtb
+	<where>
+		AND board_no = #{newBoardNo} 
+		AND cate = #{newCate}
+		AND menu = #{newMenu}
+		AND writer_id = #{newWriterId}
+		AND receiver_id = #{newReceiverId}
+	</where>
+GROUP BY room_no
+</select>
+
+<select id="selectByBoardNo">
+	SELECT * FROM board
+	WHERE board_no = #{boardNo}
+</select>
+
+<select id="selectThumbnail" resultType="Map">
+   SELECT *
+   FROM (
+       SELECT
+           B.board_no, B.title, F.thumbnail_name, B.menu, B.cate
+       FROM
+           board B
+       LEFT JOIN
+           filetb F ON B.board_no = F.board_no
+       WHERE
+       B.board_no = #{boardNo}
+       ORDER BY
+       B.board_no DESC
+   )
+</select>    
+
+<select id="selectByBoardNoInfo" resultType="Map">
+	SELECT 
+	    board_no, writer_id, writer_nick, 
+	    title, price,
+	    (SELECT thumbnail_name FROM fileTB WHERE fileTB.board_no = #{boardNo } AND rownum = 1) AS thumbnail_name
+	FROM board B
+	<where>
+		AND board_no = #{boardNo }	
+	</where>
+</select>
+
+<select id="selectNewInfo" resultType="Map">
+	SELECT 
+		nick, 
+		(SELECT thumbnail_name FROM user_file WHERE user_file.id = #{id} AND rownum = 1) AS thumbnail_name
+	FROM usertb U
+	<where>
+		AND id = #{id}
+	</where>
+</select>
+
+
+  </mapper>

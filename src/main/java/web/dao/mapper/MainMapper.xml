@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+  
+ <mapper namespace="web.dao.face.MainDao">
+
+	<!-- 카테고리에 맞는 게시판 조회 -->
+	<sql id="selectBoard">
+        SELECT 
+		    board_no, writer_id, writer_nick, 
+		    hit, menu, cate, title, price, content, location,
+		    CAST(write_date AS DATE) AS write_date, 
+		    (SELECT COUNT(*) FROM liketb R WHERE R.board_no = B.board_no) AS like_cnt,
+		    (SELECT thumbnail_name FROM fileTB WHERE fileTB.board_no = B.board_no AND rownum = 1) AS thumbnail_name
+		FROM board B
+		<where>
+			AND menu IN (1, 2, 3)
+			AND title LIKE '%' || #{searchText} || '%'
+		</where>
+     </sql>
+
+	<!-- 배너 사진 3개 받아오기 -->
+ 	<select id="getStoredName" resultType="Banner" >
+		SELECT
+			banner_no, origin_name, stored_name, file_type
+		FROM (
+			SELECT rownum rnum, B.* FROM (
+				SELECT * FROM banner
+				ORDER BY banner_no DESC
+			) B
+		)
+		WHERE rnum &lt;= 3
+ 	</select>
+ 
+ 	<!-- 대여해요 게시글 -->
+	<select id="selectRecentRentBoard" resultType="Map">
+		SELECT *
+		FROM (
+		    SELECT
+		        B.board_no, B.title, F.thumbnail_name, B.menu, B.cate
+		    FROM
+		        board B
+		    LEFT JOIN
+		        filetb F ON B.board_no = F.board_no
+		    ORDER BY
+		        B.board_no DESC
+		)
+		WHERE
+		    menu = 1 AND ROWNUM &lt;= 4
+	</select> 	
+ 	
+ 	<!-- 나눔해요 게시글 -->
+ 	<select id="selectRecentShareBoard" resultType="Map">
+		SELECT *
+		FROM (
+		    SELECT
+		        B.board_no, B.title, F.thumbnail_name, B.menu,  B.cate
+		    FROM
+		        board B
+		    LEFT JOIN
+		        filetb F ON B.board_no = F.board_no
+		    ORDER BY
+		        B.board_no DESC
+		)
+		WHERE
+		    menu = 2 AND ROWNUM &lt;= 4
+	</select>
+	
+    
+   	<!-- 업체 게시글 -->
+   	<select id="selectRecentBusinessBoard" resultType="Map">
+		SELECT *
+		FROM (
+		    SELECT
+		        B.board_no, B.title, F.thumbnail_name, B.menu,  B.cate
+		    FROM
+		        board B
+		    LEFT JOIN
+		        filetb F ON B.board_no = F.board_no
+		    ORDER BY
+		        B.board_no DESC
+		)
+		WHERE
+		    menu = 5 AND ROWNUM &lt;= 4
+	</select>
+	
+	<!-- 인기 게시글 CONTENT CLOB -> String -->
+	<resultMap id="egomap" type="map">
+	    <!-- CLOB 데이터를 String으로 매핑 -->
+	    <result property="BOARD_NO" column="BOARD_NO"/>
+	    <result property="TITLE" column="TITLE"/>
+	    <result property="MENU" column="MENU" />
+	    <result property="CATE" column="CATE" />
+	    <result property="CONTENT" column="CONTENT" javaType="java.lang.String" jdbcType="CLOB" typeHandler="org.apache.ibatis.type.ClobTypeHandler" />
+	    <result property="LIKE_NO" column="LIKE_NO"/>
+	 
+	    <result property="messagePreview" column="MESSAGE_PREVIEW" javaType="java.lang.String" jdbcType="CLOB" typeHandler="org.apache.ibatis.type.ClobTypeHandler"/>
+	</resultMap>
+	
+	<!-- 커뮤니티 인기 게시글 -->
+	<select id="selectLikeCommuBoard" resultMap="egomap">
+		SELECT board_no, title, menu, cate, content, hit
+		FROM (
+		    SELECT board_no, title, menu, cate, content, hit
+		    FROM board
+		    <where>
+		    	AND menu = 4
+		    	AND cate = 3
+		    </where>
+		    ORDER BY hit DESC
+		)
+		WHERE ROWNUM &lt;= 2
+ 	</select>
+ 	
+ 	
+	<!-- 검색 -->
+    <select id="selectCntAll" resultType="int" parameterType="web.util.Paging">
+	SELECT count(*) FROM (
+		<include refid="selectBoard"/>
+	)
+    </select>
+    
+	<!-- 검색된 게시글 조회 -->
+	<select id="selectSearch" resultType="Map" parameterType="web.util.Paging">
+	    SELECT * FROM (
+	        SELECT rownum rnum, B.* FROM (
+	            SELECT 
+	                board_no, writer_id, writer_nick,
+	                hit, menu, cate, title, price, content, location,
+	                CAST(write_date AS DATE) AS write_date,
+	                (SELECT thumbnail_name FROM fileTB WHERE fileTB.board_no = B.board_no AND rownum = 1) AS thumbnail_name
+	            FROM board B
+	            WHERE
+	                menu IN (1, 2, 3)
+                    AND title LIKE '%' || #{searchText} || '%'
+	            ORDER BY board_no DESC
+	        ) B
+	    ) WHERE rnum BETWEEN #{startNo} AND #{endNo}
+	</select>
+    
+ 	
+ 	<!-- 해당 메뉴 게시글 조회 -->
+<!-- 	<select id="selectAll" resultType="Map" parameterType="web.util.Paging"> -->
+<!-- 		SELECT * FROM ( -->
+<!-- 			SELECT rownum rnum, B.* FROM ( -->
+<!-- 				<include refid="selectBoard"/> -->
+<!-- 				ORDER BY board_no DESC -->
+<!--           	) B -->
+<!--       	) WHERE rnum BETWEEN #{startNo} AND #{endNo} -->
+<!-- 	</select> -->
+ 	
+ 	
+ 	
+ </mapper>

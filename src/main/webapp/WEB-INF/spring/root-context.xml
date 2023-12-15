@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd">
+	
+	<!-- Root Context: defines shared resources visible to all other web components -->
+		
+	 <!-- DB접속 정보 -->
+	<bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+		<property name="driverClassName" value="oracle.jdbc.driver.OracleDriver" />
+<!-- 		<property name="url" value="jdbc:oracle:thin:@needit_medium?TNS_ADMIN=/home/ubuntu/OracleCloud/Wallet_Needit" /> -->
+		<property name="url" value="jdbc:oracle:thin:@needit_medium?TNS_ADMIN=C:/OracleCloud/Wallet_Needit" />
+		<property name="username" value="NEEDIT_PROJECT" />
+		<property name="password" value="Needit12341234" />
+	</bean>		
+
+	<!-- 메일 접속 정보 -->
+	<bean id="mailSender"
+			class="org.springframework.mail.javamail.JavaMailSenderImpl">
+			<property name="host" value="smtp.gmail.com" />
+			<property name="port" value="587" />
+			<property name="username" value="BIZAcc1998@gmail.com" />
+			<property name="password" value="nweq ulid iigt mudx" />
+			<property name="javaMailProperties">
+			<props>
+				<prop key="mail.transport.protocol">smtp</prop>
+				<prop key="mail.smtp.auth">true</prop>
+				<prop key="mail.smtp.socketFactory.class">javax.net.ssl.SSLSocketFactory</prop>
+				<prop key="mail.smtp.starttls.enable">true</prop>
+				<prop key="mail.debug">true</prop>
+				<prop key="mail.smtp.ssl.trust">smtp.gmail.com</prop>
+				<prop key="mail.smtp.ssl.protocols">TLSv1.2</prop>
+			</props>
+		</property>
+	</bean>
+
+
+	<!-- 마이바티스 수행 객체 설정 (SqlSession) -->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+    
+    	<!-- 스프링 빈으로 등록된 dataSource 빈을 이용한 DB 접속 정보 설정 -->
+    	<property name="dataSource" ref="dataSource"/>
+	
+		<property name="configuration">
+			<bean class="org.apache.ibatis.session.Configuration">
+				<property name="mapUnderscoreToCamelCase" value="true" />
+				<property name="jdbcTypeForNull" value="NULL" />
+			</bean>
+		</property>	
+			
+		<!-- Mapper XML파일의 위치 설정 -->
+		<property name="mapperLocations">
+			<array>
+				<!-- ** : 모든 폴더 구조 -->
+				<!-- * : 모든 단어 -->
+				<value>classpath:/**/mapper/**/*Mapper.xml</value>			
+			</array>
+		</property>
+		
+		<property name="typeAliasesPackage">
+			<value>*.dto</value>
+		</property>
+		
+	</bean>		
+
+	<!-- 마이바티스를 이용하는 인터페이스 설정 (DAO설정) -->
+	<!-- 	-> Mapper XML의 namespace속성에 맞는 인터페이스의 위치를 설정한다 -->
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<property name="basePackage" value="*.dao" />
+	</bean>	
+
+	<!-- 트랜잭션 매니저 스프링 빈 설정 -->
+	<bean id="transanctionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+		
+</beans>
+
+
+

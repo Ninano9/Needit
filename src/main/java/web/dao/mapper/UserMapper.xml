@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="web.dao.face.UserDao">
+
+	<insert id="insertJoin" parameterType="User">
+		INSERT INTO usertb ( id,pw,name,nick,birth,email,gender,phone,addr1,addr2,email_agr,social_id)
+		VALUES (#{id}, #{pw}, #{name}, #{nick}, #{birth}, #{email}, #{gender}, #{phone}, #{addr1}, #{addr2},#{emailAgr},#{socialId})
+	</insert>
+	
+	<select id="selectCntByIdPw" resultType="int" parameterType="User">
+		SELECT count(*) FROM (
+			SELECT id,pw
+			FROM usertb
+			<where>
+				AND id = #{id}
+				AND pw = #{pw}
+			</where>
+		)
+	</select>
+
+	<select id="selectByNick" resultType="User" parameterType="User">
+		SELECT *
+		FROM usertb
+		<where>
+			AND id = #{id}
+		</where>
+	</select>
+	
+	<select id="selectCntById" resultType="int" parameterType="User">
+		SELECT count(*) FROM (
+			SELECT id
+			FROM usertb
+			<where>
+				AND id = #{id}		
+			</where>
+		)
+	</select>
+
+	<select id="selectCntByNick" resultType="int" parameterType="User">
+		SELECT count(*) FROM (
+			SELECT nick
+			FROM usertb
+			<where>
+				AND nick = #{nick}		
+			</where>
+		)
+	</select>
+
+	<select id="selectCntBySocialId" resultType="int" parameterType="User">
+		SELECT count(*) FROM (
+			SELECT *
+			FROM usertb
+			<where>
+				AND social_id = #{socialId}		
+			</where>
+		)
+	</select>
+	
+	<select id="selectByInfo" resultType="User" parameterType="User">
+		SELECT * FROM usertb
+			<where>
+				AND social_id = #{socialId}		
+			</where>
+	
+	
+	</select>
+	
+	<select id="selectById" resultType="String" parameterType="String">
+		SELECT * FROM usertb
+			<where>
+				AND name = #{name}
+				AND email = #{email}
+			</where>
+	
+	</select>
+	
+	<select id="selectByPw" resultType="User" parameterType="User">
+		SELECT * FROM usertb
+			<where>
+				AND id = #{id}
+			</where>
+	
+	</select>
+	
+	<update id="updateByPw" parameterType="String">
+		UPDATE usertb 
+ 		SET pw = #{pw}
+ 		WHERE id = #{id}
+	</update>
+</mapper>

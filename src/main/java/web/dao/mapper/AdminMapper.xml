@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+  
+<mapper namespace="web.dao.face.AdminDao">
+
+	<!-- 관리자 배너 파일 업로드 -->
+	<insert id="insertBanner" parameterType="Banner">
+		INSERT INTO banner ( banner_no, origin_name, stored_name, file_type )
+		VALUES ( banner_seq.nextval, #{originName}, #{storedName}, #{fileType} )
+	</insert>
+
+	<!-- 배너사진 불러오기 -->
+ 	<select id="getStoredName" resultType="Banner" >
+		SELECT
+			banner_no, origin_name, stored_name, file_type
+		FROM (
+			SELECT rownum rnum, B.* FROM (
+				SELECT * FROM banner
+				ORDER BY banner_no DESC
+			) B
+		)
+		WHERE rnum &lt;= 3
+ 	</select>
+ 	
+ 	<!-- 공지등록 -->
+ 	<insert id="insertNotice" parameterType="Board">
+ 		INSERT INTO board(board_no, menu, cate, writer_id, writer_nick, write_date, hit, title, price, content, location)
+ 		VALUES(board_seq.nextval, 4, 1, #{writerId}, '관리자', sysdate, 0, #{title}, 0, #{content}, '서울' )
+ 	</insert>
+ 	
+	<!-- 메인에서 공지사항 게시글 조회 -->
+	<select id="selectAllNotice" resultType="Board">
+		SELECT board_no, menu, cate, title, content, write_date
+		FROM board
+		<where>
+			AND menu = 4
+			AND cate = 1
+		</where>
+		ORDER BY board_no DESC
+	</select>
+	
+	<!-- 관리자에서 공지사항 게시글 조회 -->
+	<select id="adminSelectAllNotice" resultMap="egomap">
+	    SELECT *
+	    FROM (
+	        SELECT board_no, title, content,
+	        TO_CHAR(WRITE_DATE, 'YYYY-MM-DD') AS WRITE_DATE
+	        FROM board
+	        WHERE menu = 4
+	          AND cate = 1
+	        ORDER BY board_no DESC
+	    )
+	    ORDER BY board_no DESC
+	</select>
+	
+	<resultMap id="egomap" type="map">
+	    <!-- CLOB 데이터를 String으로 매핑 -->
+	    <result property="BOARD_NO" column="BOARD_NO"/>
+	    <result property="TITLE" column="TITLE"/>
+	    <result property="CONTENT" column="CONTENT" javaType="java.lang.String" jdbcType="CLOB" typeHandler="org.apache.ibatis.type.ClobTypeHandler" />
+	    <result property="WRITE_DATE" column="WRITE_DATE" javaType="java.lang.String"/>
+	    <result property="messagePreview" column="MESSAGE_PREVIEW" javaType="java.lang.String" jdbcType="CLOB" typeHandler="org.apache.ibatis.type.ClobTypeHandler"/>
+	</resultMap>
+	
+	<!-- 공지삭제 -->
+	<delete id="deleteNoticeFile" parameterType="Board">
+		DELETE FROM filetb
+		WHERE board_no = #{boardNo}
+	</delete>
+	
+	<delete id="deleteNotice" parameterType="Board">
+		DELETE FROM board
+		<where>
+			AND menu = 4
+			AND cate = 1
+			AND board_no = #{boardNo}
+		</where>
+	</delete>
+	
+	<!-- DB에서 이메일 받아오기 -->
+	<select id="selectAllEmail" resultType="Map">
+		SELECT email, nick
+		FROM usertb
+		WHERE email_agr = 1 
+		ORDER BY email
+	</select>
+	
+	<!-- 신고된 게시글 목록 -->
+	<select id="selectReportBoard" resultType="Map">
+	    SELECT 
+	        b.board_no,
+	        b.title,
+	        b.menu,
+	        b.cate,
+	        b.writer_id, 
+	        b.write_date,
+	        r.report_no, 
+	        r.board_no AS r_board_no,
+	        r.report_id,
+	        r.report_type,
+	        r.report_chk,
+	        r.cmt_no,
+	        TO_CHAR(r.report_date, 'YYYY-MM-DD') AS REPORT_DATE
+	    FROM 
+	        board b
+	    INNER JOIN 
+	        report r ON b.board_no = r.board_no
+	    WHERE
+	        r.cmt_no IS NULL
+	    ORDER BY r.report_no DESC
+	</select>
+	
+	<!-- 신고된 댓글 목록 -->
+	<select id="selectCmtBoard" resultType="Map">
+		SELECT
+			r.board_no,
+			b.menu,
+			b.cate,
+			b.writer_id,
+			r.report_no,
+			r.cmt_no,
+			c.content,
+			r.report_type,
+			TO_CHAR(r.report_date, 'YYYY-MM-DD') AS REPORT_DATE
+		FROM report r
+		INNER JOIN
+			board b ON r.board_no = b.board_no
+		INNER JOIN
+			commenttb c ON r.cmt_no = c.cmt_no
+		ORDER BY r.report_no DESC
+	</select>
+	
+	<!-- 사진 삭제 -->
+	<delete id="deleteFile" parameterType="Board">
+		DELETE FROM filetb
+		WHERE board_no = #{boardNo}
+	</delete>
+
+	<!-- 게시글에 있는 댓글 삭제 -->
+	<delete id="deleteCmt" parameterType="Board">
+		DELETE FROM commenttb
+		WHERE board_no = #{boardNo}
+	</delete>
+	
+	<!-- 장바구니 삭제 -->
+	<delete id="deleteBasket" parameterType="Board">
+		DELETE FROM basket
+		WHERE board_no = #{boardNo}
+	</delete>
+
+	<!-- 추천 삭제 -->
+	<delete id="deleteLike" parameterType="Board">
+		DELETE FROM liketb
+		WHERE board_no = #{boardNo}
+	</delete>
+
+	<!-- 게시글 삭제 -->
+	<delete id="deleteBoard" parameterType="Board">
+		DELETE FROM board
+		WHERE board_no = #{boardNo}
+	</delete>
+	
+	<!-- report테이블에서도 삭제해부릴까 고민중 -->
+<!-- 	<delete id="deleteReport" parameterType="Report"> -->
+<!-- 		DELETE FROM reporttb -->
+<!-- 		WHERE board_no = #{boardNo} -->
+<!-- 	</delete> -->
+	
+	<!-- 신고된 댓글 삭제 -->
+	<delete id="deleteComment" parameterType="Comment">
+		DELETE FROM commenttb
+		WHERE cmt_no = #{cmtNo}
+	</delete>
+	
+	<!-- 업체 요청 목록 -->
+	<select id="selectBusinessList" resultType="Map">
+		SELECT b.business_name, b.business_phone, b.business_addr, b.business_url,
+		       u.id, u.business_status
+		FROM business b
+		JOIN usertb u ON b.id = u.id
+		WHERE u.business_status IN (1,2)
+		ORDER BY b.id
+	</select>
+
+	<!-- 업체 요청 승인 -->
+	<update id="approveBusiness" parameterType="Business">
+		UPDATE usertb
+		SET business_status = 2
+		WHERE id = #{id}
+	</update>
+	
+	<!-- 업체 요청 취소 -->
+	<update id="cancelBusiness" parameterType="Business">
+		UPDATE usertb
+		SET business_status = 0
+		WHERE id = #{id}
+	</update>
+	
+	<delete id="deleteBusiness" parameterType="Business">
+		DELETE business
+		<where>
+			id = #{id}
+		</where>
+	</delete>
+
+</mapper>

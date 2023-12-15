@@ -1,0 +1,483 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+  
+  
+ <mapper namespace="web.dao.face.UserProfileDao">
+ 
+ 
+ 	<!-- 게시글 조회용 SQL -->
+	<sql id="selectMyBoard">
+		SELECT 
+		    board_no, writer_id, writer_nick, 
+		    hit, menu, cate, title, price, content, location,
+		    CAST(write_date AS DATE) AS write_date, 
+		    (SELECT COUNT(*) FROM liketb R WHERE R.board_no = B.board_no) AS like_cnt,
+		    (SELECT thumbnail_name FROM fileTB WHERE fileTB.board_no = B.board_no AND rownum = 1) AS thumbnail_name
+		FROM board B
+		<where>
+			writer_id = #{userId}
+		</where>
+	</sql>
+ 
+ 
+ 	<sql id="rentList">
+ 		SELECT 
+ 			rent_no, board_no , renter_id, rent_date, merchant_uid
+ 			, start_time, end_time, rent_status, payment_type
+ 		FROM rent
+ 		<where>
+ 			renter_id = #{userId}
+ 		</where>
+ 			
+ 	</sql>
+ 
+ 
+ 	
+ 
+ 
+	<!--  회원정보수정  -->
+ 	<update id="infoUpdate" parameterType="User">
+ 		UPDATE usertb 
+ 		SET pw = #{pw}, nick = #{nick}, addr1 = #{addr1}, addr2 = #{addr2}
+ 		WHERE id = #{id}
+ 	
+ 	</update> 
+ 	
+	<!--  회원탈퇴	 -->
+ 	<delete id="deleteUser" parameterType="User">
+ 		DELETE usertb
+ 		WHERE id = #{id}
+ 	</delete>
+ 	
+ 	<select id="selectCntAll" resultType="int" parameterType="web.util.Paging">
+		SELECT count(*) FROM (
+				SELECT 
+ 			rent_no, board_no , renter_id, rent_date
+ 			, start_time, end_time, rent_status
+ 		FROM rent
+ 		<where>
+ 			renter_id = #{userId}
+ 		</where>
+		)
+		
+	</select>
+	
+	
+	<select id="selectMyBoardCntAll" resultType="int" parameterType="web.util.Paging">
+		SELECT count(*) FROM (
+			<include refid="selectMyBoard"/>
+		)
+	</select>
+	
+ 	
+ 	<!-- 예약 받은 목록 -->
+ 	<select id="selectMyRentList" resultType="Map" parameterType="Board">
+	 	SELECT B.board_no, A.renter_id, A.rent_no,
+	 		TO_CHAR(A.rent_date, 'YYYY-MM-DD') AS RENT_DATE,
+	 		A.start_time
+	 	, A.end_time, A.rent_status, A.payment_type, A.merchant_uid
+	 	, TO_CHAR(CURRENT_TIME, 'YYYY-MM-DD') AS CURRENT_TIME 
+		FROM rent A
+		INNER JOIN board B ON B.board_no = A.board_no
+		WHERE B.writer_id = #{writerId}
+		ORDER BY A.rent_no DESC
+ 	</select>
+ 	
+ 	<!-- 내가 예약한 목록 -->
+ 	<select id="selectRentList" resultType="Map" parameterType="User">
+ 		SELECT B.board_no, A.renter_id, A.rent_no,
+ 		TO_CHAR(A.rent_date, 'YYYY-MM-DD') AS RENT_DATE,
+ 		  A.start_time
+ 		, A.end_time, A.rent_status, A.payment_type, A.merchant_uid
+ 		, TO_CHAR(CURRENT_TIME, 'YYYY-MM-DD') AS CURRENT_TIME 
+		FROM rent A
+		INNER JOIN board B ON B.board_no = A.board_no
+		WHERE A.renter_id = #{id}
+		ORDER BY A.rent_no DESC
+		 	
+ 	</select>
+  
+	
+<!-- 	<insert id="updateImg" parameterType="Map"> -->
+<!-- 	    <selectKey resultType="int" order="BEFORE" keyProperty="profileImgno"> -->
+<!-- 	        SELECT user_file_seq.nextval FROM dual -->
+<!-- 	    </selectKey> -->
+<!-- 	    INSERT INTO user_file( id, profile_imgno, origin_name, stored_name, thumbnail_name, file_type) -->
+<!-- 	    VALUES( #{id}, #{profileImgno}, #{originName}, #{storedName}, #{thumbnailName}, #{fileType} ) -->
+
+<!-- 	</insert> -->
+
+	<!-- 이미지가 존재하는지 확인하는 쿼리 -->
+	<select id="checkIfImageExists" resultType="int" parameterType="String">
+	    SELECT COUNT(*) FROM user_file WHERE id = #{userId}
+	</select>
+	
+	<!-- 이미지 UPDATE 쿼리 -->
+	<update id="updateImage" parameterType="UserFile">
+	    UPDATE user_file
+	    SET origin_name = #{originName},
+	        stored_name = #{storedName},
+	        thumbnail_name = #{thumbnailName},
+	        file_type = #{fileType}
+	    WHERE id = #{id}
+	</update>
+	
+	<!-- 이미지 INSERT 쿼리 -->
+	<insert id="insertImage" parameterType="UserFile">
+	    <selectKey resultType="int" order="BEFORE" keyProperty="profileImgno">
+	        SELECT user_file_seq.nextval FROM dual
+	    </selectKey>
+	    INSERT INTO user_file (id, profile_imgno, origin_name, stored_name, thumbnail_name, file_type)
+	    VALUES (#{id}, #{profileImgno}, #{originName}, #{storedName}, #{thumbnailName}, #{fileType})
+	</insert>
+
+	<!-- 회원프로필사진 삭제 -->
+	<delete id="deleteImg" parameterType="UserFile">
+		DELETE FROM user_file
+		where id = #{id}
+	
+	</delete>
+
+	<!-- 유저프로필사진 조회 -->
+	<select id="selectImg" resultType="UserFile" parameterType="String">
+		SELECT id, profile_imgno, origin_name, stored_name, thumbnail_name, file_type
+		FROM user_file
+        WHERE id = #{userId}
+	</select>
+	
+	<!-- 추천수 조회 -->
+	<select id="selectLikeByBoardNo" resultType="int" parameterType="User">
+		SELECT 
+		    COUNT(l.like_id) AS like_count
+		FROM board b
+		LEFT JOIN liketb l ON b.board_no = l.board_no
+		<where>
+		    b.writer_id = #{id}
+		</where>
+	
+	</select>
+	
+	<!-- 회원등급 -->
+	<update id="updateCrackEgg" parameterType="User">
+		UPDATE usertb
+		<set>
+			grade = '2'
+		</set>
+		<where>
+			grade = '1'
+			AND id = #{id}
+		</where>
+	</update>
+	
+	<update id="updateChick" parameterType="User">
+		UPDATE usertb
+		<set>
+			grade = '3'
+		</set>
+		<where>
+			grade = '2'
+			AND id = #{id}
+		</where>
+	</update>
+	
+	<update id="updateChicken" parameterType="User">
+		UPDATE usertb
+		<set>
+			grade = '4'
+		</set>
+		<where>
+			grade = '3'
+			AND id = #{id}
+		</where>
+	</update>
+	
+	<update id="updateFriedChicken" parameterType="User">
+		UPDATE user
+		<set>
+			grade = '5'
+		</set>
+		<where>
+			grade = '4'
+			AND id = #{id}
+		</where>
+	</update>
+	
+	<select id="selectGrade" resultType="User" parameterType="User">
+		SELECT grade,id FROM usertb
+		<where>
+			id = #{id}
+		</where>
+	</select>
+	
+	<!-- 자기소개 수정	 -->
+	<update id="updateIntroduce" parameterType="User">
+		UPDATE usertb
+		SET intro = #{intro}
+		WHERE id = #{id}
+	</update>
+	
+	<update id="updateRentStatus" parameterType="Rent">
+		UPDATE rent
+		<set>
+			rent_status = '2'
+		</set>
+		<where>
+			rent_status = '1'
+			AND board_no = #{boardNo}
+			AND rent_no = #{rentNo}
+		</where>
+		
+	</update>
+	
+	<update id="updateCancel" parameterType="Rent">
+		UPDATE rent
+		<set>
+			rent_status = '0'
+		</set>
+		<where>
+			rent_status = '1'
+			AND board_no = #{boardNo}
+			AND rent_no = #{rentNo}
+		</where>
+	</update>
+	
+	<select id="selectConfirm" resultType="int" parameterType="Rent">
+		SELECT count(*) FROM rent
+		<where>
+			AND rent_status = '2'
+			AND board_no = #{boardNo}
+			AND rent_no = #{rentNo}
+		</where>
+	</select>
+	
+	<select id="selectCancel" resultType="int" parameterType="Rent">
+		SELECT count(*) FROM rent
+		<where>
+			AND rent_status = '0'
+			AND board_no = #{boardNo}
+			AND rent_no = #{rentNo}
+		</where>
+	</select>
+
+	<!-- 유저 정보 다 가져오는거 일단 주현이가 뭐쓰는지 확인하고 *없앨게요
+	저는 grade, join_date, addr1, addr2, intro 조회 써용	 -->
+	<select id="selectUserAll" resultType="User" parameterType="User">
+		SELECT *
+		FROM usertb
+		WHERE id = #{id}
+	
+	</select>
+
+	
+	<!-- 내가 쓴 글 board_no, menu, title, write_date, hit 조회 -->
+	<select id="selectBoardById" resultType="Board" parameterType="Board">
+		SELECT board_no, menu, title, write_date, hit
+		FROM board
+		WHERE writer_id = #{writerId}
+		ORDER BY board_no DESC
+	</select>
+	
+	<!-- 내가 쓴 댓글 조회 -->
+	<select id="selectCommentById" resultType="Map" parameterType="Comment">
+		SELECT
+			c.cmt_no,
+			c.board_no,
+			c.writer_id,
+			c.writer_nick,
+			c.content,
+			CAST(c.write_date AS DATE) AS "writeDate",
+		 	b.menu
+		FROM commenttb c
+		LEFT JOIN board b ON c.board_no = b.board_no
+		
+		WHERE c.writer_id = #{writerId}
+		ORDER BY cmt_no DESC
+	</select>
+
+	<select id="basketList" resultType="Map" parameterType="Board">
+		SELECT 
+	    B.board_no, B.writer_id, B.writer_nick, 
+	    B.hit, B.menu, B.cate, B.title, B.price, B.content, B.location,
+	    CAST(B.write_date AS DATE) AS "writeDate", 
+	    (SELECT COUNT(*) FROM liketb R WHERE R.board_no = B.board_no) AS like_cnt,
+	    (SELECT thumbnail_name FROM fileTB WHERE fileTB.board_no = B.board_no AND rownum = 1) AS thumbnail_name,
+	    (SELECT count(*) FROM basket WHERE basket.board_no = B.board_no AND basket.basket_id = #{writerId}) AS basket_status
+		FROM board B
+		JOIN basket ON B.board_no = basket.board_no
+		<where>
+		    basket.basket_id = #{writerId}
+		</where>
+		ORDER BY B.board_no DESC
+	</select>
+
+	<!-- 이메일수신 수정 -->
+	<update id="updateEmailSub" parameterType="User">
+		UPDATE usertb
+		SET email_agr = #{emailAgr}
+		WHERE id = #{id}
+	</update>
+	
+<!-- 	회원정보수정할때 로그인된회원정보 가져오기 -->
+	<select id="selectLoginUser" resultType="User" parameterType="User">
+		SELECT pw, addr1, addr2
+		FROM usertb
+		WHERE id = #{id}
+	</select>
+
+	<insert id="insertBusi" parameterType="Business">
+		INSERT INTO business(  id, business_name, business_phone, business_addr, business_url)
+		VALUES( #{id}, #{businessName}, #{businessPhone}, #{businessAddr}, #{businessUrl})
+	</insert>
+	
+	<update id="updateBusiStatus" parameterType="User">
+		UPDATE userTB
+		<set>
+			business_status = '1'
+		</set>
+		<where>
+			business_status = '0'
+			AND id = #{id}
+		</where>
+	</update>
+
+	<!-- 해당 메뉴 게시글 조회 이거 페이지네이션 기능 빼버려서 안써서 성능에 영향없음-->
+	<select id="selectAll" resultType="Map" parameterType="web.util.Paging">
+		SELECT * FROM (
+			SELECT rownum rnum, B.* FROM (
+				<include refid="selectMyBoard"/>
+				ORDER BY board_no DESC
+          	) B
+      	) WHERE rnum BETWEEN #{startNo} AND #{endNo}
+	</select>
+	
+	<select id="selectEmail" resultType="User" parameterType="User">
+		SELECT email_agr FROM userTB
+    	<where>
+    		AND id = #{id}
+    	</where>
+	</select>
+	
+	<update id="updateAgree" parameterType="User">
+		UPDATE userTB
+		<set>
+			email_agr = '1'
+		</set>
+		<where>
+			AND email_agr = '0'
+			AND id = #{id}
+		</where>
+	</update>
+	
+	
+	<update id="updateDisagree" parameterType="User">
+		UPDATE userTB
+		<set>
+			email_agr = '0'
+		</set>
+		<where>
+			AND email_agr = '1'
+			AND id = #{id}
+		</where>
+	</update>
+	
+   <select id="selectBusy" parameterType="Map">
+      SELECT business.BUSINESS_URL
+      FROM usertb
+      JOIN business ON usertb.id = business.id
+      WHERE usertb.business_status = '2'
+      AND usertb.id = #{id}
+   </select>
+	
+	<select id="selectId" parameterType="Board" resultType="String">
+		SELECT writer_id FROM board
+		<where>
+			board_no = #{boardNo}
+		</where>
+	</select>
+	
+	<select id="selectYourInfo" resultType="User" parameterType="String">
+		SELECT * FROM userTB
+		<where>
+			id = #{id}
+		</where>
+	</select>
+	
+	<select id="selectYourLink" parameterType="User" resultType="Map">
+		SELECT business.BUSINESS_URL
+		FROM usertb
+		JOIN business ON usertb.id = business.id
+		WHERE usertb.business_status = '2'
+		AND usertb.id = #{id}
+	</select>
+	
+	<select id="yourThumb" resultType="UserFile" parameterType="String">
+		SELECT id, profile_imgno, origin_name, stored_name, thumbnail_name, file_type
+		FROM user_file
+        WHERE id = #{id}
+	</select>
+	
+	<select id="yourBoardList" resultType="Map" parameterType="Board">
+		SELECT board_no, menu, cate, title,
+		CAST(write_date AS DATE) AS "write_date",
+		hit
+		FROM board
+		WHERE writer_id = #{writerId}
+		ORDER BY board_no DESC
+	</select>
+	
+	
+	
+	
+	
+	<select id="selectYourCmtId" parameterType="String" resultType="String">
+		SELECT writer_id
+		FROM commenttb
+		<where>
+			cmt_no = #{cmtNo}
+		</where>
+	</select>
+	
+
+	<select id="selectYourCmtProfile" resultType="User" parameterType="String">
+		SELECT *
+		FROM usertb
+		<where>
+			id = #{id}
+		</where>
+	</select>
+
+	<select id="selectYourCmtUrl" parameterType="User" resultType="Map">
+		SELECT business.BUSINESS_URL
+		FROM usertb
+		JOIN business ON usertb.id = business.id
+		WHERE usertb.business_status = '2'
+		AND usertb.id = #{id}
+	</select>
+
+
+	<select id="selectYourCmtImg" resultType="UserFile" parameterType="String">
+		SELECT id, profile_imgno, origin_name, stored_name, thumbnail_name, file_type
+		FROM user_file
+        WHERE id = #{id}
+	</select>
+
+
+	<select id="selectYourCmtBoard" resultType="Map" parameterType="Board">
+		SELECT board_no, menu, cate, title,
+		CAST(write_date AS DATE) AS "write_date",
+		hit
+		FROM board
+		WHERE writer_id = #{writerId}
+		ORDER BY board_no DESC
+	</select>
+	
+	
+ </mapper>
+ 
+ 
+ 
+ 
+ 
